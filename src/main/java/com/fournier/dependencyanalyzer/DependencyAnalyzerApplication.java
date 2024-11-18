@@ -32,14 +32,6 @@ public class DependencyAnalyzerApplication implements CommandLineRunner {
 
         List<Pom> poms = gcpService.loadAndParsePoms(result);
 
-        poms.forEach(pom -> {
-            System.out.println(pom.toString());
-            List<Dependency> dependencies = pom.getDependencies();
-            dependencies.forEach(dependency -> {
-                System.out.println("Dependency: " + dependency.toString());
-            });
-        });
 
-        System.out.println("Finished");
     }
 }
