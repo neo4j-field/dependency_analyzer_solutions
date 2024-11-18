@@ -1,11 +1,18 @@
 package com.fournier.dependencyanalyzer.service;
 
+import com.fournier.dependencyanalyzer.model.Pom;
+import com.fournier.dependencyanalyzer.reader.PomReader;
 import com.google.cloud.storage.Blob;
 import com.google.cloud.storage.Bucket;
 import com.google.cloud.storage.Storage;
+import com.google.common.io.FileBackedOutputStream;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -17,12 +24,14 @@ import java.util.Map;
 public class GCPService {
 
     private final Storage storage;
+    private final PomReader pomReader;
 
     @Value("${gcp.bucket-name}")
     private String bucketName;
 
-    public GCPService(Storage storage) {
+    public GCPService(Storage storage, PomReader pomReader) {
         this.storage = storage;
+        this.pomReader = pomReader;
     }
 
     public Map<String, Map<String, List<String>>> filterJavaProjects() {
@@ -46,6 +55,47 @@ public class GCPService {
         return projectMap;
     }
 
+    public List<Pom> loadAndParsePoms(Map<String, Map<String, List<String>>> projectMap) {
+        List<Pom> parsedPoms = new ArrayList<>();
+
+        projectMap.forEach((parentDir, subDirMap) -> {
+            subDirMap.forEach((subDir, filePaths) -> {
+                filePaths.forEach(filePath -> {
+                    Blob blob = storage.get(this.bucketName, filePath);
+
+                    if (blob == null || blob.getSize() <= 0) {
+                        System.err.println("Blob is empty or null: " + filePath);
+                        return;
+                    }
+
+                    File tempFile = null;
+                    try {
+                        tempFile = File.createTempFile("pom", ".xml");
+
+                        try (OutputStream outputStream = new FileOutputStream(tempFile)) {
+                            blob.downloadTo(outputStream);
+                        }
+                        Pom pom = pomReader.readPom(tempFile.getAbsolutePath(), parentDir);
+                        parsedPoms.add(pom);
+                    } catch (Exception e) {
+                        System.err.println("Failed to process POM file: " + filePath);
+
+                        e.printStackTrace();
+                    } finally {
+                        // Ensure the temporary file is deleted
+                        if (tempFile != null && tempFile.exists()) {
+                            if (!tempFile.delete()) {
+                                System.err.println("Failed to delete temporary file: " + tempFile.getAbsolutePath());
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        return parsedPoms;
+    }
+
+
     private String extractParentDirectory(String filePath) {
         String[] parts = filePath.split("/");
         return parts.length > 0 ? parts[0] : "unknown";
@@ -55,14 +105,25 @@ public class GCPService {
         int firstSlash = filePath.indexOf('/');
         int lastSlash = filePath.lastIndexOf('/');
 
-        // Ensure valid indices for substring
+
         if (firstSlash == -1 || lastSlash == -1 || firstSlash >= lastSlash) {
-            return "root"; // No valid subdirectory path
+            return "root";
         }
 
         return filePath.substring(firstSlash + 1, lastSlash);
     }
+
     private boolean isJavaProjectFile(String filePath) {
         return filePath.endsWith("pom.xml") || filePath.endsWith("build.gradle") || filePath.endsWith("build.gradle.kts");
+    }
+
+    public void printProjectMap(Map<String, Map<String, List<String>>> nestedMap) {
+        nestedMap.forEach((parentDir, subDirMap) -> {
+            System.out.println("Parent Directory: " + parentDir);
+            subDirMap.forEach((subDir, filePaths) -> {
+                System.out.println("  Subdirectory: " + subDir);
+                filePaths.forEach(filePath -> System.out.println("    File: " + filePath));
+            });
+        });
     }
 }

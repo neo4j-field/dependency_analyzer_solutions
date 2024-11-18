@@ -1,9 +1,13 @@
 package com.fournier.dependencyanalyzer;
 
+import com.fournier.dependencyanalyzer.model.Dependency;
+import com.fournier.dependencyanalyzer.model.Pom;
 import com.fournier.dependencyanalyzer.service.GCPService;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.CommandLineRunner;
+
+import java.util.List;
 
 
 @SpringBootApplication
@@ -21,20 +25,21 @@ public class DependencyAnalyzerApplication implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println("Listing files in bucket:");
 
         var result = gcpService.filterJavaProjects();
+        System.out.println("Project Map");
+        gcpService.printProjectMap(result);
 
-        result.forEach((parentDir, subMap) -> {
-            System.out.println("Parent Directory: " + parentDir);
+        List<Pom> poms = gcpService.loadAndParsePoms(result);
 
-            // Iterate through the inner map
-            subMap.forEach((subDir, files) -> {
-                System.out.println("  Subdirectory: " + subDir);
-                files.forEach(file -> System.out.println("    File: " + file));
+        poms.forEach(pom -> {
+            System.out.println(pom.toString());
+            List<Dependency> dependencies = pom.getDependencies();
+            dependencies.forEach(dependency -> {
+                System.out.println("Dependency: " + dependency.toString());
             });
         });
 
-        System.out.println("done");
+        System.out.println("Finished");
     }
 }
