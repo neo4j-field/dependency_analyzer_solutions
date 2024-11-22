@@ -18,6 +18,8 @@ public class GCPConfig {
     @Value("${gcp.credentials.path}")
     private String credentialsPath;
 
+    @Value("github.org")
+
     @Bean
     public Storage storage() throws IOException {
         return StorageOptions.newBuilder()

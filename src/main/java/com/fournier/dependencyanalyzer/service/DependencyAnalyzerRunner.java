@@ -1,0 +1,66 @@
+package com.fournier.dependencyanalyzer.service;
+
+import com.fournier.dependencyanalyzer.model.Pom;
+import com.fournier.dependencyanalyzer.util.BatchUtils;
+import com.fournier.dependencyanalyzer.writer.Encoder;
+import com.fournier.dependencyanalyzer.writer.Neo4jWriter;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Component
+@ConditionalOnProperty(name = "runner.dependency-analyzer.enabled", havingValue = "true", matchIfMissing = true)
+public class DependencyAnalyzerRunner implements CommandLineRunner {
+
+    private final GCPService gcpService;
+    private final Neo4jWriter neo4jWriter;
+
+    @Autowired
+    public DependencyAnalyzerRunner(GCPService gcpService, Neo4jWriter neo4jWriter) {
+        this.gcpService = gcpService;
+        this.neo4jWriter = neo4jWriter;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        System.out.println("Running Dependency Analyzer Task");
+
+        Map<String, Map<String, List<String>>> javaProjectMap = gcpService.filterJavaProjects();
+
+        List<Pom> poms = gcpService.loadAndParsePoms(javaProjectMap);
+
+        List<Map<String, Object>> encodedPomParameters = poms.stream()
+                .map(Encoder::encodePom)
+                .toList();
+
+        Map<String, List<Map<String, Object>>> encodedDependencies = poms.stream()
+                .collect(Collectors.toMap(
+                        Pom::getFilePath,
+                        pom -> pom.getDependencies().stream()
+                                .map(Encoder::encodeDependency)
+                                .toList()
+                ));
+
+        List<Map<String, Object>> flattenedDependencies = encodedDependencies.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .peek(dependency -> dependency.put("filePath", entry.getKey())))
+                .toList();
+
+        List<List<Map<String, Object>>> dependencyBatches = BatchUtils.batchParameters(flattenedDependencies, 1000);
+        List<List<Map<String, Object>>> pomBatches = BatchUtils.batchParameters(encodedPomParameters, 1000);
+
+        System.out.println("Beginning writing POM Batches");
+        neo4jWriter.writePomBatches(pomBatches);
+        System.out.println("Completed Pom Batches");
+
+        System.out.println("Beginning writing dependency Batches");
+        neo4jWriter.writeDependencyRelationships(dependencyBatches);
+        System.out.println("Completed dependency Batches");
+    }
+}
+

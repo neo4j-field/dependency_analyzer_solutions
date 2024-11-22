@@ -82,7 +82,6 @@ public class GCPService {
 
                         e.printStackTrace();
                     } finally {
-                        // Ensure the temporary file is deleted
                         if (tempFile != null && tempFile.exists()) {
                             if (!tempFile.delete()) {
                                 System.err.println("Failed to delete temporary file: " + tempFile.getAbsolutePath());

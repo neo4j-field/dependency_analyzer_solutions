@@ -11,6 +11,18 @@ public class Dependency {
         this.version = version;
     }
 
+    public String getGroupId() {
+        return groupId;
+    }
+
+    public String getArtifactId() {
+        return artifactId;
+    }
+
+    public String getVersion() {
+        return version;
+    }
+
     @Override
     public String toString() {
         return "Dependency{" +
