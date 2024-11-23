@@ -3,7 +3,7 @@ package com.fournier.dependencyanalyzer.service;
 import com.fournier.dependencyanalyzer.model.Pom;
 import com.fournier.dependencyanalyzer.util.BatchUtils;
 import com.fournier.dependencyanalyzer.writer.Encoder;
-import com.fournier.dependencyanalyzer.writer.Neo4jWriter;
+import com.fournier.dependencyanalyzer.writer.Neo4jWriterGCP;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,12 +18,12 @@ import java.util.stream.Collectors;
 public class DependencyAnalyzerRunner implements CommandLineRunner {
 
     private final GCPService gcpService;
-    private final Neo4jWriter neo4jWriter;
+    private final Neo4jWriterGCP neo4JWriterGCP;
 
     @Autowired
-    public DependencyAnalyzerRunner(GCPService gcpService, Neo4jWriter neo4jWriter) {
+    public DependencyAnalyzerRunner(GCPService gcpService, Neo4jWriterGCP neo4JWriterGCP) {
         this.gcpService = gcpService;
-        this.neo4jWriter = neo4jWriter;
+        this.neo4JWriterGCP = neo4JWriterGCP;
     }
 
     @Override
@@ -55,11 +55,11 @@ public class DependencyAnalyzerRunner implements CommandLineRunner {
         List<List<Map<String, Object>>> pomBatches = BatchUtils.batchParameters(encodedPomParameters, 1000);
 
         System.out.println("Beginning writing POM Batches");
-        neo4jWriter.writePomBatches(pomBatches);
+        neo4JWriterGCP.writePomBatches(pomBatches);
         System.out.println("Completed Pom Batches");
 
         System.out.println("Beginning writing dependency Batches");
-        neo4jWriter.writeDependencyRelationships(dependencyBatches);
+        neo4JWriterGCP.writeDependencyRelationships(dependencyBatches);
         System.out.println("Completed dependency Batches");
     }
 }

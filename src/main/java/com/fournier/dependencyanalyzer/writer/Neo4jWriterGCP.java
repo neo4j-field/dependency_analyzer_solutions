@@ -1,6 +1,5 @@
 package com.fournier.dependencyanalyzer.writer;
 
-import com.fournier.dependencyanalyzer.util.BatchUtils;
 import org.neo4j.driver.Driver;
 import org.neo4j.driver.Session;
 import org.neo4j.driver.SessionConfig;
@@ -13,14 +12,14 @@ import java.util.Map;
 
 
 @Component
-public class Neo4jWriter {
+public class Neo4jWriterGCP {
 
     private final Driver driver;
     private final String database;
     private final SessionConfig sessionConfig;
 
 
-    public Neo4jWriter(Driver driver, @Value("${neo4j.database}") String database) {
+    public Neo4jWriterGCP(Driver driver, @Value("${neo4j.database}") String database) {
         this.driver = driver;
         this.database = database;
         this.sessionConfig = SessionConfig.builder().withDatabase(database).build();
