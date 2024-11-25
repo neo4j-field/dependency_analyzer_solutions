@@ -15,13 +15,13 @@ import java.util.stream.Collectors;
 
 @Component
 @ConditionalOnProperty(name = "runner.dependency-analyzer.enabled", havingValue = "true", matchIfMissing = true)
-public class DependencyAnalyzerRunner implements CommandLineRunner {
+public class GCPAnalyzerRunner implements CommandLineRunner {
 
     private final GCPService gcpService;
     private final Neo4jWriterGCP neo4JWriterGCP;
 
     @Autowired
-    public DependencyAnalyzerRunner(GCPService gcpService, Neo4jWriterGCP neo4JWriterGCP) {
+    public GCPAnalyzerRunner(GCPService gcpService, Neo4jWriterGCP neo4JWriterGCP) {
         this.gcpService = gcpService;
         this.neo4JWriterGCP = neo4JWriterGCP;
     }

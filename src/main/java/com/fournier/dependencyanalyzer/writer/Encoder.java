@@ -18,11 +18,38 @@ public class Encoder {
         return map;
     }
 
+
+    public static Map<String, Object> encodeRepository(Repository repository) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", repository.getId());
+        map.put("name", repository.getName());
+        map.put("fullName", repository.getFullName());
+        map.put("htmlUrl", repository.getHtmlUrl());
+        map.put("description", repository.getDescription());
+        map.put("language", repository.getLanguage());
+        map.put("stargazersCount", repository.getStargazersCount());
+        map.put("createdAt", repository.getCreatedAt());
+        map.put("updatedAt", repository.getUpdatedAt());
+        return map;
+    }
+
     public static Map<String, Object> encodeDependency(Dependency dependency) {
         Map<String, Object> map = new HashMap<>();
         map.put("groupId", dependency.getGroupId());
         map.put("artifactId", dependency.getArtifactId());
         map.put("version", dependency.getVersion());
+        return map;
+    }
+
+    public static Map<String, Object> encodeContributor(Contributor contributor) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("login", contributor.getLogin());
+        map.put("id", contributor.getId());
+        map.put("nodeId", contributor.getNodeId());
+        map.put("avatarUrl", contributor.getAvatarUrl());
+        map.put("htmlUrl", contributor.getHtmlUrl());
+        map.put("siteAdmin", contributor.getSiteAdmin());
+        map.put("contributions", contributor.getContributions());
         return map;
     }
 

@@ -4,6 +4,7 @@ package com.fournier.dependencyanalyzer.service;
 import com.fournier.dependencyanalyzer.config.GitConfig;
 import com.fournier.dependencyanalyzer.model.Contributor;
 import com.fournier.dependencyanalyzer.model.Issue;
+import com.fournier.dependencyanalyzer.model.Repository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
@@ -33,28 +34,21 @@ public class GitHubService {
         this.owner = gitConfig.getGitHubOrg();
     }
 
-    public List<Map<String, Object>> getRepositories() {
+    public List<Repository> getRepositories() {
         String url = String.format("%s/orgs/%s/repos", gitConfig.getGitHubApiUrl(), this.owner);
 
-        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+        ResponseEntity<List<Repository>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
-                new ParameterizedTypeReference<List<Map<String, Object>>>() {}
+                new ParameterizedTypeReference<List<Repository>>() {}
         );
+
+        if (response.getBody() == null || response.getBody().isEmpty()) {
+            return List.of();
+        }
 
         return response.getBody();
     }
 
-    public List<String> extractRepositoryNames(List<Map<String, Object>> repositories) {
-        List<String> repositoryNames = new ArrayList<>();
-
-        for (Map<String, Object> repo : repositories) {
-            if (repo.containsKey("name")) {
-                repositoryNames.add(repo.get("name").toString());
-            }
-        }
-
-        return repositoryNames;
-    }
 
     public List<Contributor> getContributors(String repo) {
         String url = String.format("%s/repos/%s/%s/contributors", gitConfig.getGitHubApiUrl(), this.owner, repo);
@@ -63,8 +57,6 @@ public class GitHubService {
                 url, HttpMethod.GET, null,
                 new ParameterizedTypeReference<List<Contributor>>() {}
         );
-
-        System.out.println("Response Status: " + response.getStatusCode());
 
 
         if (response.getBody() == null || response.getBody().isEmpty()) {
@@ -83,8 +75,6 @@ public class GitHubService {
                 url, HttpMethod.GET, null,
                 new ParameterizedTypeReference<List<Issue>>() {}
         );
-
-        System.out.println("Response Status: " + response.getStatusCode());
 
         if (response.getBody() == null || response.getBody().isEmpty()) {
             System.out.println("No Issues found for repository: " + repo);

@@ -19,7 +19,7 @@ public class Issue {
     @JsonProperty("html_url")
     private final String htmlUrl;
 
-    private final User user; // Nested object for the issue creator
+    private final User user;
     private final List<Label> labels;
 
     @JsonProperty("created_at")
