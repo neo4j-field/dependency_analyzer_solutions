@@ -43,5 +43,38 @@ public class Neo4jWriterGit {
         }
     }
 
+    public void writeIssueRelationships(List<List<Map<String, Object>>> issueBatches) {
+        try (Session session = driver.session(sessionConfig)) {
+            for (List<Map<String, Object>> batch : issueBatches) {
+                session.executeWrite(tx -> {
+                    String query = """
+                UNWIND $batch AS issue
+                MERGE (p:Project {name: issue.repository})
+                MERGE (i:Issue {id: issue.id})
+                SET i.title = issue.title,
+                    i.body = issue.body,
+                    i.state = issue.state,
+                    i.url = issue.url,
+                    i.htmlUrl = issue.htmlUrl,
+                    i.createdAt = issue.createdAt,
+                    i.updatedAt = issue.updatedAt,
+                    i.closedAt = issue.closedAt,
+                    i.comments = issue.comments,
+                    i.milestone = issue.milestone
+                MERGE (p)-[:HAS_ISSUE]->(i)
+                MERGE (u:User {id: issue.user.id, login: issue.user.login})
+                SET u.avatarUrl = issue.user.avatarUrl,
+                    u.htmlUrl = issue.user.htmlUrl
+                MERGE (i)-[:CREATED_BY]->(u)
+                """;
+
+                    tx.run(query, Map.of("batch", batch));
+                    return null;
+                });
+            }
+        }
+    }
+
+
 
 }

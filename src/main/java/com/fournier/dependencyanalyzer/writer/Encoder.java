@@ -57,7 +57,6 @@ public class Encoder {
     public static Map<String, Object> encodeIssue(Issue issue) {
         Map<String, Object> map = new HashMap<>();
         map.put("id", issue.getId());
-        map.put("nodeId", issue.getNodeId());
         map.put("title", issue.getTitle());
         map.put("body", issue.getBody());
         map.put("state", issue.getState());

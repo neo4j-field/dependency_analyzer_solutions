@@ -7,6 +7,7 @@ import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.List;
 
 @Configuration
 public class GitConfig {
@@ -19,6 +20,9 @@ public class GitConfig {
 
     @Value("${github.org}")
     private String gitHubOrg;
+
+    @Value("${github.org.list}")
+    private List<String> gitHubOrgList;
 
     private String gitHubPAT;
 
@@ -45,4 +49,7 @@ public class GitConfig {
         return gitHubOrg;
     }
 
+    public List<String> getGitHubOrgList() {
+        return gitHubOrgList;
+    }
 }

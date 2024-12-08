@@ -18,6 +18,9 @@ public class GCPConfig {
     @Value("${gcp.credentials.path}")
     private String credentialsPath;
 
+    @Value("${gcp.repo.bucket-name}")
+    private String repoBucketName;
+
     @Value("github.org")
 
     @Bean
@@ -30,4 +33,9 @@ public class GCPConfig {
                 .build()
                 .getService();
     }
+
+    public String getRepoBucketName() {
+        return repoBucketName;
+    }
+
 }

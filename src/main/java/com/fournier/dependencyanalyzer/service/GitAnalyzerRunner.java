@@ -1,13 +1,12 @@
 package com.fournier.dependencyanalyzer.service;
 
-import com.fournier.dependencyanalyzer.model.Contributor;
-import com.fournier.dependencyanalyzer.model.Issue;
-import com.fournier.dependencyanalyzer.model.Repository;
+import com.fournier.dependencyanalyzer.model.*;
 import com.fournier.dependencyanalyzer.util.BatchUtils;
 import com.fournier.dependencyanalyzer.writer.Encoder;
 import com.fournier.dependencyanalyzer.writer.Neo4jWriterGit;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -16,6 +15,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@ConditionalOnProperty(name = "runner.git-analyzer.enabled", havingValue = "true", matchIfMissing = true)
 public class GitAnalyzerRunner implements CommandLineRunner {
 
     private final GitHubService gitHubService;
@@ -31,18 +31,47 @@ public class GitAnalyzerRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        System.out.println("Reading Repositories from GitHub...");
-        List<Repository> repositories = gitHubService.getRepositories();
-        System.out.println("Completed Reading Repositories from Github ...");
 
-        List<String> repositoryNames = repositories.stream().map(Repository::getName).toList();
+
+
+
+
+
+
+    }
+
+    private void issuePipeline(List<String> repositoryNames){
+        Map<String, List<Issue>> repoIssuesMap = repositoryNames.stream()
+                .collect(Collectors.toMap(
+                        repo -> repo,
+                        gitHubService::getIssues
+                ));
+
+        Map<String, List<Map<String, Object>>> encodedRepoIssuesMap = repoIssuesMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .map(Encoder::encodeIssue)
+                                .collect(Collectors.toList())
+                ));
+
+        List<Map<String, Object>> flattenedIssues = encodedRepoIssuesMap.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .peek(issue -> issue.put("repository", entry.getKey())))
+                .toList();
+
+        List<List<Map<String, Object>>> issueBatches = BatchUtils.batchParameters(flattenedIssues, 1000);
+
+        this.neo4jWriterGit.writeIssueRelationships(issueBatches);
+    }
+
+    private void contributorPipeline(List<String> repositoryNames){
 
         Map<String, List<Contributor>> repoContributorsMap = repositoryNames.stream()
                 .collect(Collectors.toMap(
                         repo -> repo,
                         gitHubService::getContributors
                 ));
-
 
         Map<String, List<Map<String, Object>>> encodedRepoContributorsMap = repoContributorsMap.entrySet().stream()
                 .collect(Collectors.toMap(
@@ -58,19 +87,10 @@ public class GitAnalyzerRunner implements CommandLineRunner {
                         .peek(contributor -> contributor.put("repository", entry.getKey())))
                 .toList();
 
-        System.out.println("Batching the Contributors...");
 
         List<List<Map<String, Object>>> contributorBatches = BatchUtils.batchParameters(flattenedContributors, 1000);
 
-        System.out.println("Starting to write contributor relationships to Neo4j...");
         this.neo4jWriterGit.writeContributorRelationships(contributorBatches);
-
-        System.out.println("Completed writing contributor relationships to Neo4j Database");
-
-
-
-
-
 
     }
 }
