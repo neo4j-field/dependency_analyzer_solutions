@@ -10,6 +10,7 @@ import org.w3c.dom.NodeList;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,13 +18,27 @@ import java.util.List;
 public class PomReader {
 
     public Pom readPom(String filePath, String parentDir) {
+        try {
+            File pomFile = new File(filePath);
+            return readPomFromInputStream(pomFile.toURI().toURL().openStream(), filePath, parentDir);
+        } catch (Exception e) {
+            System.err.println("Failed to read POM file: " + filePath);
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    public Pom readPom(InputStream inputStream, String parentDir) {
+        return readPomFromInputStream(inputStream, "stream", parentDir);
+    }
+
+    private Pom readPomFromInputStream(InputStream inputStream, String sourceIdentifier, String parentDir) {
         List<Dependency> dependencies = new ArrayList<>();
 
         try {
-            File pomFile = new File(filePath);
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
             DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(pomFile);
+            Document doc = builder.parse(inputStream);
 
             doc.getDocumentElement().normalize();
             NodeList dependencyNodes = doc.getElementsByTagName("dependency");
@@ -38,12 +53,11 @@ public class PomReader {
                 dependencies.add(new Dependency(groupId, artifactId, version));
             }
         } catch (Exception e) {
-            System.err.println("Failed to read POM file: " + filePath);
+            System.err.println("Failed to read POM file from " + sourceIdentifier);
             e.printStackTrace();
         }
 
-        return new Pom(filePath, parentDir, dependencies);
-
+        return new Pom(sourceIdentifier, parentDir, dependencies);
     }
 
     private String getTagValue(String tag, Element element) {
