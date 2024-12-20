@@ -30,11 +30,13 @@ public class Issue {
     private final String closedAt;
 
     private final int comments;
-    private final String milestone;
+
+    // Updated milestone field
+    private final Milestone milestone;
 
     public Issue(
             long id, String title, String body, String state, String url, String htmlUrl, User user,
-            List<Label> labels, String createdAt, String updatedAt, String closedAt, int comments, String milestone
+            List<Label> labels, String createdAt, String updatedAt, String closedAt, int comments, Milestone milestone
     ) {
         this.id = id;
         this.title = title;
@@ -99,7 +101,7 @@ public class Issue {
         return comments;
     }
 
-    public String getMilestone() {
+    public Milestone getMilestone() {
         return milestone;
     }
 
@@ -118,7 +120,7 @@ public class Issue {
                 ", updatedAt='" + updatedAt + '\'' +
                 ", closedAt='" + closedAt + '\'' +
                 ", comments=" + comments +
-                ", milestone='" + milestone + '\'' +
+                ", milestone=" + milestone +
                 '}';
     }
 }

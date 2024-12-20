@@ -63,27 +63,24 @@ public class GCPService {
     }
 
 
-    public Map<String, List<Map<String, Pom>>> extractAndParseJavaProjects() {
-        Map<String, List<Map<String, Pom>>> result = new HashMap<>();
+    public Map<String, List<Pom>> extractAndParseJavaProjects() {
+        Map<String, List<Pom>> result = new HashMap<>();
 
         Iterable<Blob> blobs = storage.list(this.gcpConfig.getRepoBucketName()).iterateAll();
 
         for (Blob blob : blobs) {
             if (blob.getName().endsWith(".zip")) {
                 try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-                    // Download the zip file content
                     blob.downloadTo(outputStream);
 
                     try (ZipInputStream zipInputStream = new ZipInputStream(new ByteArrayInputStream(outputStream.toByteArray()))) {
                         ZipEntry entry;
 
-                        // Process each entry in the zip file
                         while ((entry = zipInputStream.getNextEntry()) != null) {
                             if (!entry.isDirectory() && entry.getName().endsWith("pom.xml")) {
                                 String filePath = entry.getName();
                                 String parentDirectory = extractParentDirectoryFromEntry(filePath);
 
-                                // Read and parse the POM file
                                 try (ByteArrayOutputStream pomOutputStream = new ByteArrayOutputStream()) {
                                     byte[] buffer = new byte[1024];
                                     int length;
@@ -94,11 +91,7 @@ public class GCPService {
                                     try (InputStream pomInputStream = new ByteArrayInputStream(pomOutputStream.toByteArray())) {
                                         Pom pom = pomReader.readPom(pomInputStream, parentDirectory);
                                         if (pom != null) {
-                                            // Add the POM data with additional fields
-                                            Map<String, Pom> pomData = new HashMap<>();
-                                            pomData.put("parentDirectory", pom);
-
-                                            result.computeIfAbsent(filePath, k -> new ArrayList<>()).add(pomData);
+                                            result.computeIfAbsent(filePath, k -> new ArrayList<>()).add(pom);
                                         }
                                     }
                                 }

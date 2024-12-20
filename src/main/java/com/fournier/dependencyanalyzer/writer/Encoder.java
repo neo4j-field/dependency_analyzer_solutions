@@ -53,6 +53,26 @@ public class Encoder {
         return map;
     }
 
+    public static Map<String, Object> encodeCommit(Commit commit) {
+        Map<String, Object> map = new HashMap<>();
+
+        map.put("sha", commit.getSha());
+
+        if (commit.getCommit() != null) {
+            map.put("message", commit.getCommit().getMessage());
+
+            if (commit.getCommit().getAuthor() != null) {
+                map.put("commitAuthor", encodeContributor(commit.getCommit().getAuthor()));
+            }
+        }
+
+        if (commit.getAuthor() != null) {
+            map.put("author", encodeContributor(commit.getAuthor()));
+        }
+
+        return map;
+    }
+
 
     public static Map<String, Object> encodeIssue(Issue issue) {
         Map<String, Object> map = new HashMap<>();

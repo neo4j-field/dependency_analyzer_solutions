@@ -32,6 +32,47 @@ public class GitAnalyzerRunner implements CommandLineRunner {
     @Override
     public void run(String... args) throws Exception {
 
+        Map<String, List<Repository>> allRepos = gitHubService.getAllRepositories();
+        commitPipeline(allRepos);
+
+
+    }
+
+
+    private void commitPipeline(Map<String, List<Repository>> allRepos){
+        Map<String, String> repoToOwnerMap = allRepos.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream().map(repo -> Map.entry(repo.getName(), entry.getKey())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<Commit>> repoCommitsMap = repoToOwnerMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> gitHubService.getCommits(entry.getKey(), entry.getValue())
+                ));
+
+
+        Map<String, List<Map<String, Object>>> encodedRepoCommitsMap = repoCommitsMap.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .map(commit -> {
+                                    Map<String, Object> commitMap = Encoder.encodeCommit(commit);
+                                    commitMap.remove("message");
+                                    return commitMap;
+                                })
+                                .collect(Collectors.toList())
+                ));
+
+        List<Map<String, Object>> flattenedCommits = encodedRepoCommitsMap.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .peek(commit -> commit.put("repository", entry.getKey())))
+                .toList();
+
+
+        List<List<Map<String, Object>>> commitBatches = BatchUtils.groupCommitsByRepositoryAndAuthor(flattenedCommits);
+
+        neo4jWriterGit.writeCommitSequences(commitBatches);
+
 
 
 
@@ -40,18 +81,26 @@ public class GitAnalyzerRunner implements CommandLineRunner {
 
     }
 
-    private void issuePipeline(List<String> repositoryNames){
-        Map<String, List<Issue>> repoIssuesMap = repositoryNames.stream()
+    private void issuePipeline(Map<String, List<Repository>> allRepos) {
+        Map<String, String> repoToOwnerMap = allRepos.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream().map(repo -> Map.entry(repo.getName(), entry.getKey())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<Issue>> repoIssuesMap = repoToOwnerMap.entrySet().stream()
                 .collect(Collectors.toMap(
-                        repo -> repo,
-                        gitHubService::getIssues
+                        Map.Entry::getKey,
+                        entry -> gitHubService.getIssues(entry.getKey(), entry.getValue())
                 ));
 
         Map<String, List<Map<String, Object>>> encodedRepoIssuesMap = repoIssuesMap.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> entry.getValue().stream()
-                                .map(Encoder::encodeIssue)
+                                .map(issue -> {
+                                    Map<String, Object> issueMap = Encoder.encodeIssue(issue);
+                                    issueMap.remove("milestone");
+                                    return issueMap;
+                                })
                                 .collect(Collectors.toList())
                 ));
 
@@ -61,16 +110,19 @@ public class GitAnalyzerRunner implements CommandLineRunner {
                 .toList();
 
         List<List<Map<String, Object>>> issueBatches = BatchUtils.batchParameters(flattenedIssues, 1000);
-
         this.neo4jWriterGit.writeIssueRelationships(issueBatches);
     }
 
-    private void contributorPipeline(List<String> repositoryNames){
+    private void contributorPipeline(Map<String, List<Repository>> allRepos){
 
-        Map<String, List<Contributor>> repoContributorsMap = repositoryNames.stream()
+        Map<String, String> repoToOwnerMap = allRepos.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream().map(repo -> Map.entry(repo.getName(), entry.getKey())))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        Map<String, List<Contributor>> repoContributorsMap = repoToOwnerMap.entrySet().stream()
                 .collect(Collectors.toMap(
-                        repo -> repo,
-                        gitHubService::getContributors
+                        Map.Entry::getKey, // Key: repository name
+                        entry -> gitHubService.getContributors(entry.getKey(), entry.getValue()) // Get contributors
                 ));
 
         Map<String, List<Map<String, Object>>> encodedRepoContributorsMap = repoContributorsMap.entrySet().stream()
@@ -92,5 +144,16 @@ public class GitAnalyzerRunner implements CommandLineRunner {
 
         this.neo4jWriterGit.writeContributorRelationships(contributorBatches);
 
+    }
+
+    private String findOwnerForRepository(String repo, Map<String, List<Repository>> allRepos) {
+        for (Map.Entry<String, List<Repository>> entry : allRepos.entrySet()) {
+            String owner = entry.getKey();
+            List<Repository> repos = entry.getValue();
+            if (repos.stream().anyMatch(r -> r.getName().equals(repo))) {
+                return owner;
+            }
+        }
+        throw new IllegalArgumentException("Owner not found for repository: " + repo);
     }
 }

@@ -78,11 +78,8 @@ public class GitHubService {
 
 
 
-
-
-
-    public List<Contributor> getContributors(String repo) {
-        String url = String.format("%s/repos/%s/%s/contributors", gitConfig.getGitHubApiUrl(), this.owner, repo);
+    public List<Contributor> getContributors(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/contributors", gitConfig.getGitHubApiUrl(), owner, repo);
 
         ResponseEntity<List<Contributor>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
@@ -99,8 +96,8 @@ public class GitHubService {
         return response.getBody();
     }
 
-    public List<Issue> getIssues(String repo) {
-        String url = String.format("%s/repos/%s/%s/issues", gitConfig.getGitHubApiUrl(), this.owner, repo);
+    public List<Issue> getIssues(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/issues", gitConfig.getGitHubApiUrl(), owner, repo);
 
         ResponseEntity<List<Issue>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
@@ -116,8 +113,9 @@ public class GitHubService {
         return response.getBody() == null ? List.of() : response.getBody();
     }
 
-    public List<DependabotAlert> getDependabotAlerts(String repo) {
-        String url = String.format("%s/repos/%s/%s/dependabot/alerts", gitConfig.getGitHubApiUrl(), this.owner, repo);
+
+    public List<DependabotAlert> getDependabotAlerts(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/dependabot/alerts", gitConfig.getGitHubApiUrl(), owner, repo);
 
         ResponseEntity<List<DependabotAlert>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
@@ -133,8 +131,25 @@ public class GitHubService {
     }
 
 
-    public List<CodeScanningAlert> getCodeScanningAlerts(String repo) {
-        String url = String.format("%s/repos/%s/%s/code-scanning/alerts", gitConfig.getGitHubApiUrl(), this.owner, repo);
+    public List<Commit> getCommits(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/commits", gitConfig.getGitHubApiUrl(), owner, repo);
+
+        ResponseEntity<List<Commit>> response = restTemplate.exchange(
+                url, HttpMethod.GET, null,
+                new ParameterizedTypeReference<List<Commit>>() {}
+        );
+
+        if (response.getBody() == null || response.getBody().isEmpty()) {
+            System.out.println("No commits found for repository: " + repo);
+            return List.of();
+        }
+
+        return response.getBody();
+    }
+
+
+    public List<CodeScanningAlert> getCodeScanningAlerts(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/code-scanning/alerts", gitConfig.getGitHubApiUrl(), owner, repo);
 
         ResponseEntity<List<CodeScanningAlert>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
@@ -149,8 +164,8 @@ public class GitHubService {
         return response.getBody();
     }
 
-    public List<SecurityAdvisory> getSecurityAdvisories(String repo) {
-        String url = String.format("%s/repos/%s/%s/security-advisories", gitConfig.getGitHubApiUrl(), this.owner, repo);
+    public List<SecurityAdvisory> getSecurityAdvisories(String repo, String owner) {
+        String url = String.format("%s/repos/%s/%s/security-advisories", gitConfig.getGitHubApiUrl(), owner, repo);
 
         ResponseEntity<List<SecurityAdvisory>> response = restTemplate.exchange(
                 url, HttpMethod.GET, null,
@@ -165,6 +180,17 @@ public class GitHubService {
         return response.getBody();
     }
 
+
+    private String findOwnerForRepository(String repo, Map<String, List<Repository>> allRepos) {
+        for (Map.Entry<String, List<Repository>> entry : allRepos.entrySet()) {
+            String owner = entry.getKey();
+            List<Repository> repos = entry.getValue();
+            if (repos.stream().anyMatch(r -> r.getName().equals(repo))) {
+                return owner;
+            }
+        }
+        throw new IllegalArgumentException("Owner not found for repository: " + repo);
+    }
 
 
 }

@@ -9,6 +9,8 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,46 +41,88 @@ public class GCPAnalyzerRunner implements CommandLineRunner {
 
     public void zipPipeline(){
 
-        Map<String, List<Map<String, Pom>>> data = gcpService.extractAndParseJavaProjects();
+        Map<String, List<Pom>> data = gcpService.extractAndParseJavaProjects();
 
         List<Map<String, Object>> encodedPomParameters = data.values().stream()
-                .flatMap(List::stream) // Flatten the list of maps
-                .map(map -> {
-                    Pom pom = map.get("parentDirectory"); // Extract the Pom object
-                    return Encoder.encodePom(pom); // Encode the POM
-                })
+                .flatMap(List::stream)
+                .map(Encoder::encodePom)
                 .toList();
 
-        List<Map<String, Object>> flattenedDependencies = data.entrySet().stream()
-                .flatMap(entry -> entry.getValue().stream() // Flatten the list of maps
-                        .flatMap(map -> {
-                            Pom pom = map.get("parentDirectory"); // Extract the Pom object
-                            if (pom == null || pom.getDependencies() == null) {
-                                return Stream.empty();
-                            }
-                            return pom.getDependencies().stream()
-                                    .map(dependency -> {
-                                        Map<String, Object> dependencyMap = Encoder.encodeDependency(dependency); // Encode the dependency
-                                        dependencyMap.put("filePath", entry.getKey()); // Add filePath to the dependency
-                                        return dependencyMap;
-                                    });
-                        }))
+
+
+        Map<String, List<Map<String, Object>>> encodedDependencies = data.entrySet().stream()
+                .collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> entry.getValue().stream()
+                                .flatMap(pom -> pom.getDependencies().stream())
+                                .map(Encoder::encodeDependency)
+                                .toList()
+                ));
+
+
+        List<Map<String, Object>> flattenedDependencies = encodedDependencies.entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream()
+                        .peek(dependency -> dependency.put("filePath", entry.getKey()))) // Add filePath to each dependency
                 .toList();
 
-        // Step 4: Batch dependencies and POMs
+
+        System.out.println("Flattened Dependencies (First 10 Records):");
+        flattenedDependencies.stream()
+                .limit(10) // Limit to the first 10 records
+                .forEach(dependency -> {
+                    System.out.println("Dependency Record:");
+                    System.out.println("  filePath: " + dependency.get("filePath"));
+                    System.out.println("  groupId: " + dependency.get("groupId"));
+                    System.out.println("  artifactId: " + dependency.get("artifactId"));
+                    System.out.println("  version: " + dependency.get("version"));
+                    System.out.println("  Other Fields: " + dependency); // Print entire map for additional details
+                    System.out.println("----------");
+                });
+
+        System.out.println("Encoded POM Parameters (First 10 Records):");
+        encodedPomParameters.stream()
+                .limit(10) // Limit to the first 10 records
+                .forEach(pom -> {
+                    System.out.println("POM Record:");
+                    System.out.println("  filePath: " + pom.get("filePath"));
+                    System.out.println("  parentDirectory: " + pom.get("parentDirectory"));
+                    System.out.println("  Other Fields: " + pom); // Print entire map for additional details
+                    System.out.println("----------");
+                });
+
+
+        Instant totalStart = Instant.now();
+
         List<List<Map<String, Object>>> dependencyBatches = BatchUtils.batchParameters(flattenedDependencies, 1000);
+
         List<List<Map<String, Object>>> pomBatches = BatchUtils.batchParameters(encodedPomParameters, 1000);
 
-        System.out.println("starting to write to Neo4j");
+        if (!dependencyBatches.isEmpty()) {
+            System.out.println("Top 5 records from the first batch of dependencies:");
+            List<Map<String, Object>> firstBatch = dependencyBatches.get(0);
+            firstBatch.stream().limit(5).forEach(record -> {
+                System.out.println("Dependency Record: ");
+                record.forEach((key, value) -> System.out.println("  " + key + ": " + value));
+            });
+        } else {
+            System.out.println("No dependency batches found.");
+        }
+
+        System.out.println("Beginning writing POM Batches...");
+        Instant pomWriteStart = Instant.now();
         neo4JWriterGCP.writePomBatches(pomBatches);
+        Instant pomWriteEnd = Instant.now();
+        System.out.println("Completed POM Batches in " + Duration.between(pomWriteStart, pomWriteEnd).toMillis() + " ms.");
+
+        System.out.println("Beginning writing Dependency Batches...");
+        Instant dependencyWriteStart = Instant.now();
         neo4JWriterGCP.writeDependencyRelationships(dependencyBatches);
+        Instant dependencyWriteEnd = Instant.now();
+        System.out.println("Completed Dependency Batches in " + Duration.between(dependencyWriteStart, dependencyWriteEnd).toMillis() + " ms.");
 
-
-        System.out.println("end writing to Neo4j");
-
-
-
-
+        // Total elapsed time
+        Instant totalEnd = Instant.now();
+        System.out.println("Total time taken for process: " + Duration.between(totalStart, totalEnd).toMillis() + " ms.");
 
 
 

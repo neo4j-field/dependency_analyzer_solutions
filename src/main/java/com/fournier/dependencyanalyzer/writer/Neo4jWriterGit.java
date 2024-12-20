@@ -33,7 +33,7 @@ public class Neo4jWriterGit {
                 SET c.avatarUrl = contributor.avatarUrl,
                     c.htmlUrl = contributor.htmlUrl,
                     c.contributions = contributor.contributions
-                MERGE (p)-[:HAS_CONTRIBUTOR]->(c)
+                MERGE (p)-[:HAS_NEW_CONTRIBUTOR_TEST]->(c)
                 """;
 
                     tx.run(query, Map.of("batch", batch));
@@ -42,6 +42,45 @@ public class Neo4jWriterGit {
             }
         }
     }
+
+    public void writeCommitSequences(List<List<Map<String, Object>>> commitBatches) {
+        try (Session session = driver.session(sessionConfig)) {
+            for (List<Map<String, Object>> batch : commitBatches) {
+                session.executeWrite(tx -> {
+                    String query = """
+                    UNWIND $batch AS commitData
+                    WITH collect(commitData) AS commits
+
+                    // Create NEXT_COMMIT relationships
+                    UNWIND range(0, size(commits) - 2) AS index
+                    WITH commits, commits[index] AS currentCommit, commits[index + 1] AS nextCommit
+                    MERGE (c1:Commit {sha: currentCommit.sha})
+                    SET c1.repository = currentCommit.repository
+                    MERGE (c2:Commit {sha: nextCommit.sha})
+                    SET c2.repository = nextCommit.repository
+                    MERGE (c1)-[:NEXT_COMMIT]->(c2)
+
+                    WITH commits[0] AS headCommit
+                    MATCH (c:Commit {sha: headCommit.sha}) 
+                    MATCH (contributor:Contributor {login: headCommit.author.login})
+                    MERGE (contributor)-[:HAS_COMMIT]->(c)
+                    
+                    WITH headCommit, c
+                    
+                    MATCH (p:Project {name: headCommit.repository})
+                    MERGE (p)-[:HAS_HEAD_COMMIT]->(c)
+                """;
+
+                    tx.run(query, Map.of("batch", batch));
+                    return null;
+                });
+            }
+        }
+    }
+
+
+
+
 
     public void writeIssueRelationships(List<List<Map<String, Object>>> issueBatches) {
         try (Session session = driver.session(sessionConfig)) {
@@ -74,6 +113,8 @@ public class Neo4jWriterGit {
             }
         }
     }
+
+
 
 
 

@@ -52,10 +52,15 @@ public class Neo4jWriterGCP {
             for (List<Map<String, Object>> batch : dependencyBatches) {
                 session.executeWrite(tx -> {
                     String query = """
-                    UNWIND $batch AS dependency
-                    MATCH (p:Pom {filePath: dependency.filePath})
-                    MERGE (d:Dependency {groupId: dependency.groupId, artifactId: dependency.artifactId, version: dependency.version})
-                    MERGE (p)-[:DEPENDS_ON]->(d)
+                            UNWIND $batch AS dependency
+                            WITH dependency
+                            WHERE dependency.groupId IS NOT NULL\s
+                              AND dependency.artifactId IS NOT NULL\s
+                              AND dependency.version IS NOT NULL\s
+                              AND NOT dependency.version CONTAINS '$'\s
+                            MERGE (p:Pom {filePath: dependency.filePath})
+                            MERGE (d:Dependency {groupId: dependency.groupId, artifactId: dependency.artifactId, version: dependency.version})
+                            MERGE (p)-[:NEW_DEPENDS_ON]->(d)
                     """;
 
                     tx.run(query, Map.of("batch", batch));
